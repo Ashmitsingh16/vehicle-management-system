@@ -1,0 +1,426 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Vehicle Management System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Inter:wght@300;400;600&display=swap');
+
+  :root {
+    --bg-dark: #0f172a;
+    --bg-panel: rgba(30, 41, 59, 0.7);
+    --border-glow: rgba(56, 189, 248, 0.5);
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-cyan: #38bdf8;
+    --accent-blue: #3b82f6;
+    --accent-red: #ef4444;
+    --accent-red-glow: rgba(239, 68, 68, 0.6);
+    --accent-green: #22c55e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: radial-gradient(circle at top, #1e293b, var(--bg-dark));
+    min-height: 100vh;
+    color: var(--text-main);
+    overflow-x: hidden;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-dark); }
+  ::-webkit-scrollbar-thumb { background: var(--accent-cyan); border-radius: 10px; }
+
+  .container {
+    max-width: 1400px; /* Wider for car screens */
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glow);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+  }
+
+  .header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px var(--border-glow);
+    margin-bottom: 5px;
+  }
+
+  .header p {
+    color: var(--text-muted);
+    font-weight: 300;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .nav-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+    background: var(--bg-panel);
+    border-radius: 20px;
+    padding: 15px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.05);
+    overflow-x: auto;
+  }
+
+  .nav-tab {
+    padding: 15px 30px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 500;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .nav-tab:hover {
+    color: var(--text-main);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 15px var(--border-glow) inset;
+  }
+
+  .nav-tab.active {
+    background: var(--accent-cyan);
+    color: var(--bg-dark);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 20px var(--border-glow);
+  }
+
+  .content-section {
+    display: none;
+    background: var(--bg-panel);
+    border-radius: 25px;
+    padding: 35px;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    margin-bottom: 20px;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .content-section.active { display: block; }
+  
+  .content-section h2 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text-main);
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+    border-bottom: 2px solid var(--accent-cyan);
+    padding-bottom: 10px;
+    display: inline-block;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+  }
+
+  .stat-card {
+    background: linear-gradient(145deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9));
+    border: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-main);
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 4px;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 10px var(--accent-cyan);
+  }
+
+  .stat-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(56, 189, 248, 0.15);
+  }
+
+  .stat-card h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 3rem;
+    margin-bottom: 10px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 15px var(--border-glow);
+  }
+
+  .stat-card p {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .emergency-button {
+    background: transparent;
+    color: var(--accent-red);
+    border: 2px solid var(--accent-red);
+    padding: 25px 40px;
+    font-size: 1.8rem;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2), inset 0 0 20px rgba(239, 68, 68, 0.1);
+    margin: 20px auto;
+    display: block;
+    width: 100%;
+    max-width: 600px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .emergency-button:hover {
+    background: var(--accent-red);
+    color: white;
+    box-shadow: 0 0 40px var(--accent-red-glow), inset 0 0 20px rgba(255,255,255,0.5);
+    transform: scale(1.02);
+  }
+  
+  .emergency-button:active {
+    transform: scale(0.98);
+  }
+
+  .form-group { margin-bottom: 25px; }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 18px 20px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-main);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+    background: rgba(15, 23, 42, 1);
+  }
+  
+  .form-group select option {
+    background: var(--bg-dark);
+    color: var(--text-main);
+  }
+
+  .map-container {
+    margin: 20px 0;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 2px solid rgba(255,255,255,0.05);
+  }
+
+  .location-info {
+    background: linear-gradient(145deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9));
+    border: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-main);
+    padding: 25px;
+    border-radius: 20px;
+    margin: 20px 0;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  }
+  
+  .location-info p { margin-bottom: 10px; font-size: 1.1rem; }
+  .location-info strong { color: var(--accent-cyan); }
+
+  .notification {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    padding: 20px 30px;
+    border-radius: 15px;
+    color: white;
+    font-weight: 600;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+    z-index: 9999;
+    transform: translateX(150%);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+    opacity: 0;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .notification.show { transform: translateX(0); opacity: 1; }
+
+  .notification.success { background: rgba(34, 197, 94, 0.9); box-shadow: 0 0 20px rgba(34, 197, 94, 0.4); }
+  .notification.error { background: rgba(239, 68, 68, 0.9); box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); }
+
+  .activity-log {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 20px;
+    padding: 25px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .activity-log h3 { color: var(--text-muted); margin-bottom: 15px; font-family: 'Orbitron', sans-serif; }
+
+  .activity-item {
+    padding: 15px;
+    border-left: 4px solid var(--accent-cyan);
+    margin-bottom: 15px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 0 10px 10px 0;
+    font-size: 1.05rem;
+  }
+
+  .table-container { overflow-x: auto; margin-top: 20px; border-radius: 15px; }
+
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  th, td {
+    padding: 18px 20px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  th {
+    background: rgba(30, 41, 59, 0.9);
+    color: var(--accent-cyan);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  
+  tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+  tr:hover { background: rgba(56, 189, 248, 0.05); }
+
+  .btn {
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent-cyan);
+    border: 1px solid var(--accent-cyan);
+    padding: 12px 25px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 5px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+  }
+
+  .btn:hover {
+    background: var(--accent-cyan);
+    color: var(--bg-dark);
+    box-shadow: 0 0 15px var(--border-glow);
+    transform: translateY(-2px);
+  }
+
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-red);
+    border-color: var(--accent-red);
+  }
+  
+  .btn-danger:hover {
+    background: var(--accent-red);
+    color: white;
+    box-shadow: 0 0 15px var(--accent-red-glow);
+  }
+
+  .emergency-services {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+  }
+
+  .service-card {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+    border-top: 3px solid var(--accent-red);
+  }
+  
+  .service-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(239, 68, 68, 0.15);
+  }
+
+  .service-card h3 {
+    color: var(--accent-red);
+    margin-bottom: 15px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.3rem;
+  }
+
+  .service-card p {
+    margin: 10px 0 20px 0;
+    font-size: 1.2rem;
+    color: var(--text-main);
+    font-weight: 600;
+  }
+
+  @media (max-width: 1024px) {
+    .nav-tabs { flex-wrap: wrap; }
+    .nav-tab { flex: 1; min-width: 150px; text-align: center; }
+  }
+  
+  @media (max-width: 768px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .emergency-services { grid-template-columns: 1fr; }
+    .header h1 { font-size: 2rem; }
+    .emergency-button { font-size: 1.4rem; padding: 20px; }
+  }
+</style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/></head><body><div class="container"><div class="header"><h1>🚗 Vehicle Management System</h1><p>Your safety is our priority</p></div><div class="nav-tabs"><button class="nav-tab active" onclick="showSection('dashboard')">Dashboard</button><button class="nav-tab" onclick="showSection('emergency')">Emergency</button><button class="nav-tab" onclick="showSection('tracking')">Tracking</button><button class="nav-tab" onclick="showSection('users')">Users</button><button class="nav-tab" onclick="showSection('vehicles')">Vehicles</button><button class="nav-tab" onclick="showSection('contacts')">Contacts</button></div><div id="notification" class="notification"></div><div id="dashboard" class="content-section active"><h2>Dashboard Overview</h2><div class="dashboard-grid"><div class="stat-card"><h3 id="totalUsers">0</h3><p>Total Users</p></div><div class="stat-card"><h3 id="totalVehicles">0</h3><p>Registered Vehicles</p></div><div class="stat-card"><h3 id="emergencyContacts">0</h3><p>Emergency Contacts</p></div><div class="stat-card"><h3 id="emergencyStatus">Inactive</h3><p>Emergency Status</p></div></div><div class="activity-log"><h3>Recent Activity</h3><div id="activityList"><div class="activity-item">System initialized</div></div></div></div><div id="emergency" class="content-section"><h2>Emergency Alert System</h2><div class="form-group"><label for="emergencyType">Emergency Type:</label><select id="emergencyType"><option value="accident">Vehicle Accident</option><option value="breakdown">Vehicle Breakdown</option><option value="medical">Medical Emergency</option><option value="security">Security Threat</option><option value="fire">Fire Emergency</option><option value="other">Other</option></select></div><div class="form-group"><label for="severityLevel">Severity Level:</label><select id="severityLevel"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div><div class="form-group"><label for="emergencyDescription">Description:</label><textarea id="emergencyDescription" rows="4" placeholder="Describe the emergency situation..."></textarea></div><div class="form-group"><label for="recipientEmail">Send Alert To (Email):</label><input type="email" id="recipientEmail" placeholder="e.g. someone@example.com" required></div><button class="emergency-button" onclick="triggerEmergency()">🚨 TRIGGER EMERGENCY ALERT</button></div><div id="tracking" class="content-section"><h2>GPS Tracking</h2><div class="location-info"><h3>Current Location</h3><p><strong>Address:</strong> <span id="currentLocation">Getting location...</span></p><p><strong>Coordinates:</strong> <span id="currentCoords">-</span></p><p>Last Updated: <span id="lastUpdated">Never</span></p><button class="btn" onclick="getCurrentLocation()">Update Location</button><button class="btn" onclick="startTracking()">Start Tracking</button><button class="btn" onclick="stopTracking()">Stop Tracking</button></div><div class="map-container"><div id="map" style="height:400px;width:100%"></div></div></div><div id="users" class="content-section"><h2>User Management</h2><div class="form-group"><label for="userName">Name:</label><input type="text" id="userName" placeholder="Enter full name"></div><div class="form-group"><label for="userEmail">Email:</label><input type="email" id="userEmail" placeholder="Enter email address"></div><div class="form-group"><label for="userPhone">Phone:</label><input type="tel" id="userPhone" placeholder="Enter phone number"></div><button class="btn" onclick="addUser()">Add User</button><div class="table-container"><table id="userTable"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div><div id="vehicles" class="content-section"><h2>Vehicle Management</h2><div class="form-group"><label for="vehicleMake">Make:</label><input type="text" id="vehicleMake" placeholder="e.g., Toyota"></div><div class="form-group"><label for="vehicleModel">Model:</label><input type="text" id="vehicleModel" placeholder="e.g., Camry"></div><div class="form-group"><label for="vehicleYear">Year:</label><input type="number" id="vehicleYear" placeholder="e.g., 2023"></div><div class="form-group"><label for="vehicleLicense">License Plate:</label><input type="text" id="vehicleLicense" placeholder="e.g., ABC-123"></div><div class="form-group"><label for="vehicleOwner">Owner:</label><select id="vehicleOwner"><option value="">Select Owner</option></select></div><button class="btn" onclick="addVehicle()">Add Vehicle</button><div class="table-container"><table id="vehicleTable"><thead><tr><th>Make</th><th>Model</th><th>Year</th><th>License</th><th>Owner</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div><div id="contacts" class="content-section"><h2>Emergency Contacts</h2><div class="emergency-services" id="predefinedContacts"><div class="service-card"><h3>🚓 Nearest Police Station</h3><p id="policeContact">Loading...</p><button class="btn" onclick="addPredefinedContact('police')">Add to Contacts</button></div><div class="service-card"><h3>🚒 Nearest Fire Station</h3><p id="fireContact">Loading...</p><button class="btn" onclick="addPredefinedContact('fire')">Add to Contacts</button></div><div class="service-card"><h3>🏥 Nearest Hospital</h3><p id="hospitalContact">Loading...</p><button class="btn" onclick="addPredefinedContact('hospital')">Add to Contacts</button></div><div class="service-card"><h3>🛠️ Roadside Assistance</h3><p id="roadsideContact">Loading...</p><button class="btn" onclick="addPredefinedContact('roadside')">Add to Contacts</button></div></div><h3>Personal Emergency Contacts</h3><div class="form-group"><label for="contactName">Name:</label><input type="text" id="contactName" placeholder="Enter contact name"></div><div class="form-group"><label for="contactPhone">Phone:</label><input type="tel" id="contactPhone" placeholder="Enter phone number"></div><div class="form-group"><label for="contactRelation">Relationship:</label><select id="contactRelation"><option value="family">Family Member</option><option value="friend">Friend</option><option value="colleague">Colleague</option><option value="emergency">Emergency Service</option><option value="other">Other</option></select></div><button class="btn" onclick="addContact()">Add Contact</button><div class="table-container"><table id="contactTable"><thead><tr><th>Name</th><th>Phone</th><th>Relationship</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div></div><script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script><script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAt_l-CK_Rgdq3YZvYk8g2i3lqkjn457R0&libraries=places"></script><script>const BASE_URL=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:5000/api':'https://YOUR_RENDER_BACKEND_URL/api';const API_CONFIG={baseURL:BASE_URL,endpoints:{users:"/register",vehicles:"/vehicles",contacts:"/contacts",emergencies:"/emergencies",tracking:"/tracking"},headers:{"Content-Type":"application/json"}};const EMERGENCY_SERVICES={"default":{police:{name:"Local Police",phone:"100",relation:"emergency"},fire:{name:"Fire Department",phone:"101",relation:"emergency"},hospital:{name:"Ambulance Service",phone:"102",relation:"emergency"},roadside:{name:"Roadside Assistance",phone:"1800-123-4567",relation:"emergency"}},"us":{police:{name:"Local Police",phone:"911",relation:"emergency"},fire:{name:"Fire Department",phone:"911",relation:"emergency"},hospital:{name:"Ambulance Service",phone:"911",relation:"emergency"},roadside:{name:"AAA Roadside Assistance",phone:"1-800-222-4357",relation:"emergency"}},"uk":{police:{name:"Police",phone:"999",relation:"emergency"},fire:{name:"Fire Brigade",phone:"999",relation:"emergency"},hospital:{name:"Ambulance",phone:"999",relation:"emergency"},roadside:{name:"RAC Breakdown",phone:"0333-2000-999",relation:"emergency"}},"eu":{police:{name:"Police",phone:"112",relation:"emergency"},fire:{name:"Fire Department",phone:"112",relation:"emergency"},hospital:{name:"Ambulance",phone:"112",relation:"emergency"},roadside:{name:"Roadside Assistance",phone:"+44-123-456-7890",relation:"emergency"}}};let users=[];let vehicles=[];let contacts=[];let trackingInterval=null;let emergencyActive=false;let currentRegion="default";let currentLocation={lat:28.4595,lng:77.0266};let map;let marker;document.addEventListener("DOMContentLoaded",function(){initializeApp();});async function initializeApp(){try{showNotification("Initializing application...","success");const response=await fetch(`${API_CONFIG.baseURL}/users`);if(response.ok){users=await response.json();}else{users=[];}const vRes=await fetch(`${API_CONFIG.baseURL}/vehicles`);if(vRes.ok){vehicles=await vRes.json();}else{vehicles=[];}contacts=[{id:1,name:'Emergency Services',phone:'911',relation:'emergency'},{id:2,name:'Family Contact',phone:'+1234567890',relation:'family'}];updateDashboard();updateUserTable();updateVehicleTable();updateContactTable();updateVehicleOwnerOptions();updatePredefinedContacts();initMap();getCurrentLocation();showNotification("Application initialized successfully!","success");}catch(error){console.error("Failed to initialize app:",error);showNotification("Application initialized in demo mode.","success");updateDashboard();}}function showSection(sectionId){document.querySelectorAll(".content-section").forEach((section)=>{section.classList.remove("active");});document.querySelectorAll(".nav-tab").forEach((tab)=>{tab.classList.remove("active");});document.getElementById(sectionId).classList.add("active");event.target.classList.add("active");if(sectionId==='tracking'){initMap(currentLocation.lat,currentLocation.lng);}}function showNotification(message,type="success"){const notification=document.getElementById("notification");notification.textContent=message;notification.className=`notification ${type}`;notification.classList.remove("show");void notification.offsetWidth;notification.classList.add("show");setTimeout(()=>{notification.classList.remove("show");setTimeout(()=>{notification.textContent="";},300);},3000);}async function triggerEmergency(){const emergencyType=document.getElementById("emergencyType").value;const severityLevel=document.getElementById("severityLevel").value;const description=document.getElementById("emergencyDescription").value;const recipientEmail=document.getElementById("recipientEmail").value;if(!recipientEmail){showNotification("Please enter a recipient email!","error");return;}showNotification("🚨 EMERGENCY ALERT TRIGGERED!","error");emergencyActive=true;updateDashboard();addActivity(`Emergency Alert: ${emergencyType} (${severityLevel} severity)`);try{await fetch(`${API_CONFIG.baseURL}/emergencies`,{method:'POST',headers:API_CONFIG.headers,body:JSON.stringify({type:emergencyType,severity:severityLevel,description:description,location:currentLocation,recipientEmail:recipientEmail})});}catch(err){console.error('Failed to send emergency to backend',err);}let emergencyService="";switch(emergencyType){case"accident":case"security":emergencyService="police";break;case"fire":emergencyService="fire";break;case"medical":emergencyService="hospital";break;case"breakdown":emergencyService="roadside";break;}if(emergencyService){const service=EMERGENCY_SERVICES[currentRegion][emergencyService];addActivity(`Automatically contacted ${service.name} at ${service.phone}`);showNotification(`Contacted ${service.name} at ${service.phone}`,"success");}setTimeout(()=>{showNotification("Emergency services have been notified. Help is on the way!","success");},2000);}function initMap(lat=28.4595,lng=77.0266){if(document.getElementById('map')){map=new google.maps.Map(document.getElementById('map'),{center:{lat,lng},zoom:15});if(marker)marker.setMap(null);marker=new google.maps.Marker({position:{lat,lng},map:map,title:"Your Location"});}}async function getCurrentLocation(){if(navigator.geolocation){navigator.geolocation.getCurrentPosition(async function(position){const lat=position.coords.latitude;const lng=position.coords.longitude;currentLocation={lat,lng};document.getElementById("currentCoords").textContent=`${lat.toFixed(6)}, ${lng.toFixed(6)}`;document.getElementById("lastUpdated").textContent=new Date().toLocaleTimeString();if(lat>24.396308&&lat<49.384358&&lng>-125.000000&&lng<-66.934570){currentRegion="us";}else if(lat>35.000000&&lat<71.000000&&lng>-9.000000&&lng<40.000000){currentRegion="eu";}else if(lat>49.000000&&lat<61.000000&&lng>-11.000000&&lng<2.000000){currentRegion="uk";}else{currentRegion="default";}getAddress(lat,lng);showNotification("Location updated successfully!","success");updatePredefinedContacts();initMap(lat,lng);},function(error){const lat=28.4595+(Math.random()-0.5)*0.01;const lng=77.0266+(Math.random()-0.5)*0.01;currentLocation={lat,lng};document.getElementById("currentCoords").textContent=`${lat.toFixed(6)}, ${lng.toFixed(6)} (Demo Location)`;document.getElementById("lastUpdated").textContent=new Date().toLocaleTimeString();showNotification("Using demo location","success");updatePredefinedContacts();initMap(lat,lng);});}else{showNotification("Geolocation is not supported","error");}}function getAddress(lat,lng){const geocoder=new google.maps.Geocoder();geocoder.geocode({location:{lat,lng}},(results,status)=>{if(status==='OK'&&results[0]){const address=results[0].formatted_address;document.getElementById("currentLocation").textContent=address;}else{document.getElementById("currentLocation").textContent="Address not available";}});}function startTracking(){if(!trackingInterval){getCurrentLocation();trackingInterval=setInterval(getCurrentLocation,5000);showNotification("Tracking started - updating every 5 seconds","success");}else{showNotification("Tracking is already active","error");}}function stopTracking(){if(trackingInterval){clearInterval(trackingInterval);trackingInterval=null;showNotification("Tracking stopped","success");}else{showNotification("No active tracking to stop","error");}}function updatePredefinedContacts(){const services=EMERGENCY_SERVICES[currentRegion];document.getElementById("policeContact").textContent=`${services.police.name}: ${services.police.phone}`;document.getElementById("fireContact").textContent=`${services.fire.name}: ${services.fire.phone}`;document.getElementById("hospitalContact").textContent=`${services.hospital.name}: ${services.hospital.phone}`;document.getElementById("roadsideContact").textContent=`${services.roadside.name}: ${services.roadside.phone}`;}function addPredefinedContact(type){const service=EMERGENCY_SERVICES[currentRegion][type];const newContact={id:Date.now(),name:service.name,phone:service.phone,relation:service.relation};if(!contacts.some(c=>c.phone===service.phone)){contacts.push(newContact);updateContactTable();updateDashboard();addActivity(`Added ${service.name} to emergency contacts`);showNotification(`${service.name} added to contacts!`,"success");}else{showNotification(`${service.name} is already in your contacts`,"error");}}function updateDashboard(){document.getElementById("totalUsers").textContent=users.length;document.getElementById("totalVehicles").textContent=vehicles.length;document.getElementById("emergencyContacts").textContent=contacts.length;document.getElementById("emergencyStatus").textContent=emergencyActive?"ACTIVE":"Inactive";}function addActivity(message){const activityList=document.getElementById("activityList");const activityItem=document.createElement("div");activityItem.className="activity-item";activityItem.textContent=`${new Date().toLocaleTimeString()} - ${message}`;activityList.insertBefore(activityItem,activityList.firstChild);}async function addUser(){const name=document.getElementById("userName").value;const email=document.getElementById("userEmail").value;const phone=document.getElementById("userPhone").value;if(name&&email&&phone){try{const response=await fetch(`${API_CONFIG.baseURL}/users`,{method:'POST',headers:API_CONFIG.headers,body:JSON.stringify({name,email,phone})});if(response.ok){const data=await response.json();users.push(data);updateUserTable();updateVehicleOwnerOptions();updateDashboard();addActivity(`New user added: ${name}`);document.getElementById("userName").value="";document.getElementById("userEmail").value="";document.getElementById("userPhone").value="";showNotification("User added successfully!","success");}else{showNotification("Failed to add user. Email might exist.","error");}}catch(err){showNotification("Server error","error");}}else{showNotification("Please fill all fields","error");}}function updateUserTable(){const tbody=document.querySelector("#userTable tbody");tbody.innerHTML="";users.forEach(user=>{const row=tbody.insertRow();row.innerHTML=`<td>${user.name}</td><td>${user.email}</td><td>${user.phone || 'N/A'}</td><td><button class="btn btn-danger" onclick="deleteUser('${user._id || user.id}')">Delete</button></td>`;});}async function deleteUser(id){try{const response=await fetch(`${API_CONFIG.baseURL}/users/${id}`,{method:'DELETE'});if(response.ok){users=users.filter(user=>(user._id||user.id)!==id);updateUserTable();updateVehicleOwnerOptions();updateDashboard();addActivity(`User deleted`);showNotification("User deleted successfully!","success");}else{showNotification("Failed to delete user","error");}}catch(err){showNotification("Server error","error");}}async function addVehicle(){const make=document.getElementById("vehicleMake").value;const model=document.getElementById("vehicleModel").value;const year=document.getElementById("vehicleYear").value;const license=document.getElementById("vehicleLicense").value;const ownerId=document.getElementById("vehicleOwner").value;if(make&&model&&year&&license&&ownerId){try{const response=await fetch(`${API_CONFIG.baseURL}/vehicles`,{method:'POST',headers:API_CONFIG.headers,body:JSON.stringify({make,model,year:parseInt(year),license,owner:ownerId})});if(response.ok){const vehicle=await response.json();vehicles.push(vehicle);updateVehicleTable();updateDashboard();addActivity(`New vehicle added: ${make} ${model}`);document.getElementById("vehicleMake").value="";document.getElementById("vehicleModel").value="";document.getElementById("vehicleYear").value="";document.getElementById("vehicleLicense").value="";document.getElementById("vehicleOwner").value="";showNotification("Vehicle added successfully!","success");}else{const e=await response.json();showNotification(e.msg||"Failed to add vehicle","error");}}catch(err){showNotification("Server error","error");}}else{showNotification("Please fill all fields","error");}}function updateVehicleTable(){const tbody=document.querySelector("#vehicleTable tbody");tbody.innerHTML="";vehicles.forEach(vehicle=>{const ownerObj=vehicle.owner&&typeof vehicle.owner==='object'?vehicle.owner:users.find(u=>String(u._id||u.id)===String(vehicle.owner||vehicle.ownerId));const row=tbody.insertRow();row.innerHTML=`<td>${vehicle.make}</td><td>${vehicle.model}</td><td>${vehicle.year}</td><td>${vehicle.license}</td><td>${ownerObj?ownerObj.name:'Unknown'}</td><td><button class="btn btn-danger" onclick="deleteVehicle('${vehicle._id||vehicle.id}')">Delete</button></td>`;});}async function deleteVehicle(id){try{const response=await fetch(`${API_CONFIG.baseURL}/vehicles/${id}`,{method:'DELETE'});if(response.ok){vehicles=vehicles.filter(v=>(v._id||v.id)!==id);updateVehicleTable();updateDashboard();addActivity(`Vehicle deleted`);showNotification("Vehicle deleted successfully!","success");}else{showNotification("Failed to delete vehicle","error");}}catch(err){showNotification("Server error","error");}}function updateVehicleOwnerOptions(){const select=document.getElementById("vehicleOwner");select.innerHTML='<option value="">Select Owner</option>';users.forEach(user=>{const option=document.createElement("option");option.value=user._id||user.id;option.textContent=user.name;select.appendChild(option);});}function addContact(){const name=document.getElementById("contactName").value;const phone=document.getElementById("contactPhone").value;const relation=document.getElementById("contactRelation").value;if(name&&phone&&relation){const newContact={id:Date.now(),name:name,phone:phone,relation:relation};contacts.push(newContact);updateContactTable();updateDashboard();addActivity(`New emergency contact added: ${name}`);document.getElementById("contactName").value="";document.getElementById("contactPhone").value="";document.getElementById("contactRelation").value="family";showNotification("Contact added successfully!","success");}else{showNotification("Please fill all fields","error");}}function updateContactTable(){const tbody=document.querySelector("#contactTable tbody");tbody.innerHTML="";contacts.forEach(contact=>{const row=tbody.insertRow();row.innerHTML=`<td>${contact.name}</td><td>${contact.phone}</td><td>${contact.relation}</td><td><button class="btn btn-danger" onclick="deleteContact(${contact.id})">Delete</button></td>`;});}function deleteContact(id){contacts=contacts.filter(contact=>contact.id!==id);updateContactTable();updateDashboard();addActivity(`Emergency contact deleted`);showNotification("Contact deleted successfully!","success");}</script>
+<script src="script.js"></script>
+</body></html>
