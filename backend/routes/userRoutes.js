@@ -21,6 +21,34 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   POST /api/users
+// @desc    Add or return existing user (Dashboard)
+// @access  Public
+router.post('/', async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    let user = await User.findOne({ email });
+    if (user) {
+      // If user exists, update their details optionally or just return them
+      user.name = name || user.name;
+      user.phone = phone || user.phone;
+      await user.save();
+      return res.json(user);
+    }
+    user = new User({
+      name,
+      email,
+      phone,
+      password: 'defaultPassword123!' // required by the model
+    });
+    await user.save();
+    res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // @route   GET /api/users/:id
 // @desc    Get user by ID
 // @access  Public
