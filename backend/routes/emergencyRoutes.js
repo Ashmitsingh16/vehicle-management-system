@@ -20,8 +20,45 @@ router.post('/', async (req, res) => {
 
     const emergency = await newEmergency.save();
     
-    // Send email using Nodemailer
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    // Send email using Google Apps Script (HTTP) or Nodemailer (SMTP)
+    if (process.env.GOOGLE_SCRIPT_URL) {
+      try {
+        const mapsUrl = location && location.lat && location.lng 
+          ? `https://www.google.com/maps/dir/?api=1&destination=${location.lat},${location.lng}` 
+          : 'Location not available';
+
+        const htmlContent = `
+            <h2>🚨 Vehicle Emergency Alert</h2>
+            <p><strong>Type:</strong> ${type}</p>
+            <p><strong>Severity:</strong> ${severity}</p>
+            <p><strong>Description:</strong> ${description || 'No description provided.'}</p>
+            <hr />
+            <h3>📍 Location Details</h3>
+            ${mapsUrl !== 'Location not available' 
+              ? `<p>The user has shared their real-time location.</p>
+                 <a href="${mapsUrl}" style="background-color:#ff4757;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;display:inline-block;font-weight:bold;">Get Directions to User</a>
+                 <br /><br />
+                 <p><small>Coordinates: ${location.lat}, ${location.lng}</small></p>`
+              : '<p>Location coordinates are not available.</p>'}
+          `;
+
+        const payload = {
+          to: recipientEmail || 'asshmit2005@gmail.com',
+          subject: `🚨 EMERGENCY ALERT: ${type.toUpperCase()} (${severity.toUpperCase()})`,
+          html: htmlContent
+        };
+
+        const response = await fetch(process.env.GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.text();
+        console.log('HTTP Email sent via Google Script successfully!', result);
+      } catch (emailErr) {
+        console.error('Failed to send HTTP email:', emailErr);
+      }
+    } else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       try {
         const transporter = nodemailer.createTransport({
           host: process.env.EMAIL_HOST || 'smtp.gmail.com',
