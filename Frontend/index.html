@@ -1,0 +1,541 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Vehicle Management System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg-page: #0b0b0d;
+    --surface-1: #131316;
+    --surface-2: #18181c;
+    --surface-3: #1f1f24;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text-main: #f2f2f3;
+    --text-muted: #9a9aa2;
+    --text-faint: #6b6b74;
+    --accent: #5b8cff;
+    --accent-dim: rgba(91,140,255,0.12);
+    --accent-strong: #3f6de0;
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.12);
+    --amber: #f5b942;
+    --amber-dim: rgba(245,185,66,0.12);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.28);
+    --shadow-pop: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Manrope', sans-serif;
+    background: var(--bg-page);
+    min-height: 100vh;
+    color: var(--text-main);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+  }
+
+  .header {
+    text-align: left;
+    margin-bottom: 24px;
+    padding: 28px 32px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .header h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+
+  .header p {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 0.95rem;
+  }
+
+  .nav-tabs {
+    display: flex;
+    justify-content: flex-start;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 6px;
+    overflow-x: auto;
+  }
+
+  .nav-tab {
+    padding: 10px 20px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .nav-tab:hover {
+    color: var(--text-main);
+    background: var(--surface-2);
+  }
+
+  .nav-tab.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: rgba(91,140,255,0.3);
+  }
+
+  .content-section {
+    display: none;
+    background: var(--surface-1);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+    animation: fadeIn 0.25s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .content-section.active { display: block; }
+
+  .content-section h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--text-main);
+    margin-bottom: 24px;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 24px;
+    border-radius: var(--radius-md);
+    text-align: left;
+    transition: border-color 0.15s ease;
+  }
+
+  .stat-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .stat-card h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-main);
+  }
+
+  .stat-card p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .emergency-button {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    padding: 18px 32px;
+    font-size: 1.05rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    margin: 16px auto;
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    letter-spacing: -0.01em;
+  }
+
+  .emergency-button:hover {
+    background: #dc2626;
+  }
+
+  .emergency-button:active {
+    transform: scale(0.99);
+  }
+
+  .form-group { margin-bottom: 20px; }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    transition: border-color 0.15s ease;
+    font-family: 'Manrope', sans-serif;
+  }
+
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
+  .form-group select option {
+    background: var(--surface-2);
+    color: var(--text-main);
+  }
+
+  .map-container {
+    margin: 16px 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .location-info {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 20px 24px;
+    border-radius: var(--radius-md);
+    margin: 16px 0;
+  }
+
+  .location-info p { margin-bottom: 8px; font-size: 0.95rem; color: var(--text-muted); }
+  .location-info p strong { color: var(--text-main); font-weight: 600; }
+
+  .notification {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    padding: 14px 20px;
+    border-radius: var(--radius-md);
+    color: white;
+    font-weight: 600;
+    font-family: 'Manrope', sans-serif;
+    z-index: 9999;
+    transform: translateX(150%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    opacity: 0;
+    box-shadow: var(--shadow-pop);
+    font-size: 0.9rem;
+  }
+
+  .notification.show { transform: translateX(0); opacity: 1; }
+
+  .notification.success { background: #16a34a; }
+  .notification.error { background: var(--red); }
+
+  .warning-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: var(--amber-dim);
+    border: 1px solid rgba(245,185,66,0.35);
+    color: var(--amber);
+    padding: 14px 20px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .warning-banner.show { display: flex; }
+  .warning-banner span { font-size: 0.9rem; color: var(--text-main); }
+  .warning-banner .btn { border-color: rgba(245,185,66,0.4); color: var(--amber); background: transparent; margin: 0; white-space: nowrap; }
+  .warning-banner .btn:hover { background: var(--amber-dim); }
+
+  .field-disabled { opacity: 0.45; pointer-events: none; }
+
+  .emergency-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: var(--red-dim);
+    border: 1px solid rgba(239,68,68,0.35);
+    color: var(--text-main);
+    padding: 16px 24px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .emergency-banner.show { display: flex; }
+  .emergency-banner .eb-text { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: var(--red); font-size: 0.95rem; }
+  .emergency-banner .eb-text small { display: block; color: var(--text-muted); font-family: 'Manrope', sans-serif; font-weight: 400; margin-top: 4px; }
+  .emergency-banner .btn { margin: 0; white-space: nowrap; }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-pop);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    max-width: 440px;
+    width: 100%;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .modal-box.critical { border-color: rgba(239,68,68,0.5); }
+
+  .modal-box h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--text-main);
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+
+  .modal-summary { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px 18px; margin-bottom: 22px; }
+  .modal-summary div { margin-bottom: 10px; font-size: 0.88rem; color: var(--text-muted); }
+  .modal-summary div:last-child { margin-bottom: 0; }
+  .modal-summary strong { color: var(--text-main); font-weight: 600; }
+
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions .btn { flex: 1; margin: 0; text-align: center; }
+
+  .activity-log {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .activity-log h3 { color: var(--text-main); margin-bottom: 14px; font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 600; }
+
+  .activity-item {
+    padding: 12px 14px;
+    border-left: 2px solid var(--accent);
+    margin-bottom: 10px;
+    background: var(--surface-1);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+
+  .table-container { overflow-x: auto; margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  th, td {
+    padding: 14px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+  }
+
+  th {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+
+  .btn {
+    background: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border-strong);
+    padding: 9px 18px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    margin: 4px;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  .btn:hover {
+    background: var(--surface-3);
+    border-color: var(--text-faint);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--red);
+    border-color: rgba(239,68,68,0.4);
+  }
+
+  .btn-danger:hover {
+    background: var(--red-dim);
+    border-color: var(--red);
+  }
+
+  .emergency-services {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .service-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    transition: border-color 0.15s ease;
+  }
+
+  .service-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .service-card h3 {
+    color: var(--text-main);
+    margin-bottom: 10px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .service-card p {
+    margin: 0 0 16px 0;
+    font-size: 1rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  @media (max-width: 1024px) {
+    .nav-tabs { flex-wrap: wrap; }
+    .nav-tab { flex: 1; min-width: 130px; text-align: center; }
+  }
+
+  @media (max-width: 768px) {
+    .container { padding: 16px 12px 40px; }
+    .header { padding: 20px; }
+    .content-section { padding: 20px; }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .emergency-services { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.5rem; }
+    .emergency-button { font-size: 0.95rem; padding: 16px; }
+  }  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-page);padding:20px;}
+  .auth-box{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:32px;max-width:380px;width:100%;}
+  .auth-box h1{font-size:1.3rem;margin:0 0 4px;}
+  .auth-sub{color:var(--text-muted);margin:0 0 20px;font-size:0.9rem;}
+  .auth-tabs{display:flex;gap:8px;margin-bottom:18px;}
+  .auth-tab{flex:1;padding:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);cursor:pointer;font-size:0.85rem;}
+  .auth-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .auth-form{display:none;}
+  .auth-form.active{display:block;}
+  .auth-error{color:#ff6767;min-height:18px;margin-top:10px;font-size:0.85rem;}
+  .auth-link{margin-top:14px;font-size:0.85rem;text-align:center;}
+  .auth-link a{color:var(--accent);text-decoration:none;}
+  .auth-link a:hover{text-decoration:underline;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:var(--text-muted);font-size:0.9rem;}
+</style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/></head><body>
+<div id="authScreen" class="auth-screen">
+  <div class="auth-box">
+    <h1>🚗 Vehicle Management System</h1>
+    <p class="auth-sub">Your safety is our priority</p>
+
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="loginTabBtn" onclick="showAuthTab('login')">Log In</button>
+      <button type="button" class="auth-tab" id="registerTabBtn" onclick="showAuthTab('register')">Create Account</button>
+    </div>
+
+    <div id="loginTab" class="auth-form active">
+      <div class="form-group"><label for="loginEmail">Email:</label><input type="email" id="loginEmail" placeholder="you@company.com"></div>
+      <div class="form-group"><label for="loginPassword">Password:</label><input type="password" id="loginPassword" placeholder="Your password"></div>
+      <button class="btn" onclick="handleLogin()">Log In</button>
+      <p class="auth-link"><a href="#" onclick="showAuthTab('forgot');return false;">Forgot password?</a></p>
+    </div>
+
+    <div id="registerTab" class="auth-form">
+      <div class="form-group"><label for="regCompanyName">Company Name:</label><input type="text" id="regCompanyName" placeholder="Acme Logistics"></div>
+      <div class="form-group"><label for="regName">Your Name:</label><input type="text" id="regName" placeholder="Full name"></div>
+      <div class="form-group"><label for="regEmail">Email:</label><input type="email" id="regEmail" placeholder="you@company.com"></div>
+      <div class="form-group"><label for="regPhone">Phone:</label><input type="tel" id="regPhone" placeholder="Phone number"></div>
+      <div class="form-group"><label for="regPassword">Password:</label><input type="password" id="regPassword" placeholder="At least 6 characters"></div>
+      <button class="btn" onclick="handleRegister()">Create Account</button>
+    </div>
+
+    <div id="forgotTab" class="auth-form">
+      <p class="auth-sub" style="margin-top:0;">Your login email is your account ID. Enter it below and we'll email you a link to reset your password.</p>
+      <div class="form-group"><label for="forgotEmail">Email:</label><input type="email" id="forgotEmail" placeholder="you@company.com"></div>
+      <button class="btn" onclick="handleForgotPassword()">Send Reset Link</button>
+      <p class="auth-link"><a href="#" onclick="showAuthTab('login');return false;">Back to log in</a></p>
+    </div>
+
+    <div id="resetTab" class="auth-form">
+      <p class="auth-sub" style="margin-top:0;">Choose a new password.</p>
+      <div class="form-group"><label for="resetPassword">New Password:</label><input type="password" id="resetPassword" placeholder="At least 6 characters"></div>
+      <div class="form-group"><label for="resetPasswordConfirm">Confirm Password:</label><input type="password" id="resetPasswordConfirm" placeholder="Repeat password"></div>
+      <button class="btn" onclick="handleResetPassword()">Set New Password</button>
+    </div>
+
+    <p id="authError" class="auth-error"></p>
+  </div>
+</div>
+<div id="appRoot" class="container" style="display:none;">
+  <div class="topbar"><span id="companyLabel"></span><button class="btn btn-danger" onclick="handleLogout()">Log Out</button></div><div class="header"><h1>🚗 Vehicle Management System</h1><p>Your safety is our priority</p></div><div class="nav-tabs"><button class="nav-tab active" onclick="showSection('dashboard')">Dashboard</button><button class="nav-tab" onclick="showSection('emergency')">Emergency</button><button class="nav-tab" onclick="showSection('tracking')">Tracking</button><button class="nav-tab" onclick="showSection('users')">Users</button><button class="nav-tab" onclick="showSection('vehicles')">Vehicles</button><button class="nav-tab" onclick="showSection('contacts')">Contacts</button></div><div id="notification" class="notification"></div><div id="emergencyBanner" class="emergency-banner"><div class="eb-text">🚨 EMERGENCY ACTIVE <small id="emergencyBannerDetail"></small></div><button class="btn" onclick="resolveEmergency()">Mark Resolved</button></div><div id="dashboard" class="content-section active"><h2>Dashboard Overview</h2><div class="dashboard-grid"><div class="stat-card"><h3 id="totalUsers">0</h3><p>Total Users</p></div><div class="stat-card"><h3 id="totalVehicles">0</h3><p>Registered Vehicles</p></div><div class="stat-card"><h3 id="emergencyContacts">0</h3><p>Emergency Contacts</p></div><div class="stat-card"><h3 id="emergencyStatus">Inactive</h3><p>Emergency Status</p></div></div><div class="activity-log"><h3>Recent Activity</h3><div id="activityList"><div class="activity-item">System initialized</div></div></div></div><div id="emergency" class="content-section"><h2>Emergency Alert System</h2><div class="form-group"><label for="emergencyType">Emergency Type:</label><select id="emergencyType"><option value="accident">Vehicle Accident</option><option value="breakdown">Vehicle Breakdown</option><option value="medical">Medical Emergency</option><option value="security">Security Threat</option><option value="fire">Fire Emergency</option><option value="other">Other</option></select></div><div class="form-group"><label for="severityLevel">Severity Level:</label><select id="severityLevel"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div><div class="form-group"><label for="emergencyDescription">Description:</label><textarea id="emergencyDescription" rows="4" placeholder="Describe the emergency situation..."></textarea></div><div class="form-group"><label for="recipientEmail">Additional Alert Email (Optional):</label><input type="email" id="recipientEmail" placeholder="e.g. additional@example.com"></div><button class="emergency-button" onclick="openEmergencyModal()">🚨 TRIGGER EMERGENCY ALERT</button></div><div id="tracking" class="content-section"><h2>GPS Tracking</h2><div id="trackingErrorBanner" class="warning-banner"><span id="trackingErrorText">⚠️ Location unavailable — check browser permissions.</span><button class="btn" onclick="getCurrentLocation()">Retry</button></div><div class="location-info"><h3>Current Location</h3><p><strong>Address:</strong> <span id="currentLocation">Getting location...</span></p><p><strong>Coordinates:</strong> <span id="currentCoords">-</span></p><p>Last Updated: <span id="lastUpdated">Never</span></p><button class="btn" onclick="getCurrentLocation()">Update Location</button><button class="btn" onclick="startTracking()">Start Tracking</button><button class="btn" onclick="stopTracking()">Stop Tracking</button></div><div class="map-container"><div id="map" style="height:400px;width:100%"></div></div></div><div id="users" class="content-section"><h2>User Management</h2><div class="form-group"><label for="userName">Name:</label><input type="text" id="userName" placeholder="Enter full name"></div><div class="form-group"><label for="userEmail">Email:</label><input type="email" id="userEmail" placeholder="Enter email address"></div><div class="form-group"><label for="userPhone">Phone:</label><input type="tel" id="userPhone" placeholder="Enter phone number"></div><button class="btn" onclick="addUser()">Add User</button><div class="table-container"><table id="userTable"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div><div id="vehicles" class="content-section"><h2>Vehicle Management</h2><div id="vehicleOwnerWarning" class="warning-banner"><span>⚠️ No users yet — add a user before assigning a vehicle owner.</span><button class="btn" onclick="showSection('users'); document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active')); document.querySelector('.nav-tab[onclick*=users]').classList.add('active');">Go to Users</button></div><div id="vehicleFormFields"><div class="form-group"><label for="vehicleMake">Make:</label><input type="text" id="vehicleMake" placeholder="e.g., Toyota"></div><div class="form-group"><label for="vehicleModel">Model:</label><input type="text" id="vehicleModel" placeholder="e.g., Camry"></div><div class="form-group"><label for="vehicleYear">Year:</label><input type="number" id="vehicleYear" placeholder="e.g., 2023"></div><div class="form-group"><label for="vehicleLicense">License Plate:</label><input type="text" id="vehicleLicense" placeholder="e.g., ABC-123"></div><div class="form-group"><label for="vehicleOwner">Owner:</label><select id="vehicleOwner"><option value="">Select Owner</option></select></div><button class="btn" id="addVehicleBtn" onclick="addVehicle()">Add Vehicle</button></div><div class="table-container"><table id="vehicleTable"><thead><tr><th>Make</th><th>Model</th><th>Year</th><th>License</th><th>Owner</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div><div id="contacts" class="content-section"><h2>Emergency Contacts</h2><p id="regionNote" style="color:var(--text-muted);margin-bottom:15px;font-size:0.9rem;">📍 Showing contacts for: <span id="regionLabel">default region</span> — enable location access for contacts specific to your area.</p><div class="emergency-services" id="predefinedContacts"><div class="service-card"><h3>🚓 Nearest Police Station</h3><p id="policeContact">Loading...</p><button class="btn" onclick="addPredefinedContact('police')">Add to Contacts</button></div><div class="service-card"><h3>🚒 Nearest Fire Station</h3><p id="fireContact">Loading...</p><button class="btn" onclick="addPredefinedContact('fire')">Add to Contacts</button></div><div class="service-card"><h3>🏥 Nearest Hospital</h3><p id="hospitalContact">Loading...</p><button class="btn" onclick="addPredefinedContact('hospital')">Add to Contacts</button></div><div class="service-card"><h3>🛠️ Roadside Assistance</h3><p id="roadsideContact">Loading...</p><button class="btn" onclick="addPredefinedContact('roadside')">Add to Contacts</button></div></div><h3>Personal Emergency Contacts</h3><div class="form-group"><label for="contactName">Name:</label><input type="text" id="contactName" placeholder="Enter contact name"></div><div class="form-group"><label for="contactPhone">Phone:</label><input type="tel" id="contactPhone" placeholder="Enter phone number"></div><div class="form-group"><label for="contactRelation">Relationship:</label><select id="contactRelation"><option value="family">Family Member</option><option value="friend">Friend</option><option value="colleague">Colleague</option><option value="emergency">Emergency Service</option><option value="other">Other</option></select></div><button class="btn" onclick="addContact()">Add Contact</button><div class="table-container"><table id="contactTable"><thead><tr><th>Name</th><th>Phone</th><th>Relationship</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div></div><div id="emergencyModalOverlay" class="modal-overlay"><div id="emergencyModalBox" class="modal-box"><h3>⚠️ Confirm Emergency Alert</h3><div class="modal-summary"><div><strong>Type:</strong> <span id="modalType"></span></div><div><strong>Severity:</strong> <span id="modalSeverity"></span></div><div><strong>Description:</strong> <span id="modalDescription"></span></div><div><strong>Will notify:</strong> <span id="modalRecipients"></span></div></div><div class="modal-actions"><button class="btn" onclick="closeEmergencyModal()">Cancel</button><button class="btn btn-danger" onclick="confirmEmergency()">Confirm &amp; Send Alert</button></div></div></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="auth.js"></script>
+<script src="app.js"></script>
+</body></html>
