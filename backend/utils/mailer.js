@@ -1,31 +1,31 @@
-const nodemailer = require('nodemailer');
-
-// Returns null if email isn't configured yet, so callers can skip sending
-// gracefully instead of crashing.
-function getTransporter() {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: process.env.EMAIL_PORT || 587,
-    secure: process.env.EMAIL_PORT == 465,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-}
-
+// Uses Resend (https://resend.com) over HTTPS instead of raw SMTP, because
+// many free hosting tiers (including Render's) block outbound SMTP ports
+// like 587/465 to prevent spam abuse. HTTPS-based email APIs aren't affected.
 async function sendMail({ to, subject, html }) {
-  const transporter = getTransporter();
-  if (!transporter) {
-    throw new Error('Email is not configured (EMAIL_USER/EMAIL_PASS missing)');
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('Email is not configured (RESEND_API_KEY missing)');
   }
-  return transporter.sendMail({
-    from: `"Vehicle Management System" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM || 'Vehicle Management System <onboarding@resend.dev>',
+      to,
+      subject,
+      html
+    })
   });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Resend API error (${res.status}): ${errBody}`);
+  }
+
+  return res.json();
 }
 
 module.exports = { sendMail };
