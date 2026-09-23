@@ -9,6 +9,7 @@ require('./config/production')();
 require('./config/jwt').getJwtSecret();
 
 const app = express();
+app.disable('x-powered-by');
 require('./middleware/rateLimit').configureProxy(app);
 
 // Middleware
@@ -16,7 +17,7 @@ app.use(bodyParser.json());
 
 // CORS — restrict to frontend origin in production, allow all in development
 const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',')
+  ? process.env.CORS_ORIGIN.split(',').map(value => value.trim()).filter(Boolean)
   : ['http://localhost:3000', 'http://127.0.0.1:5500', 'http://localhost:5500'];
 
 app.use(cors({
@@ -26,7 +27,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    return callback(Object.assign(new Error('Origin is not allowed'), { status: 403 }));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -46,14 +47,12 @@ app.use('/api/emergency', require('./routes/emergencyRoutes'));
 app.use('/api/tracking', require('./routes/trackingRoutes'));
 
 // Health check route
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Vehicle Management System API is running' });
-});
+app.get('/api/health', require('./middleware/health')());
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).send('Something broke!');
+  res.status(err.status || 500).json({ message: err.status === 403 ? 'Origin is not allowed' : 'Request failed' });
 });
 
 module.exports = app;

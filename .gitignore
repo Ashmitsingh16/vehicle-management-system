@@ -13,3 +13,10 @@ Thumbs.db
 .env.save
 .env.*
 !backend/.env.example
+
+# Private configuration and downloaded credentials
+.env.*
+!.env.example
+!.env.local.example
+client_secret*.json
+*password*.txt
