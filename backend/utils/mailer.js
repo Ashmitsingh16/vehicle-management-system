@@ -11,6 +11,9 @@ const { google } = require('googleapis');
 //   GMAIL_USER            (the Gmail address these tokens belong to)
 
 function buildRawMessage({ to, from, subject, html }) {
+  for (const value of [to, from, subject]) {
+    if (typeof value !== 'string' || /[\r\n]/.test(value)) throw new Error('Invalid email header');
+  }
   const messageParts = [
     `From: ${from}`,
     `To: ${to}`,
@@ -55,4 +58,4 @@ async function sendMail({ to, subject, html }) {
   });
 }
 
-module.exports = { sendMail };
+module.exports = { sendMail, buildRawMessage };

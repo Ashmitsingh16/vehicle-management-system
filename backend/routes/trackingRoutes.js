@@ -1,63 +1,53 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth');
+const TrackingSession = require('../models/TrackingSession');
+router.use(auth);
 
-// In-memory store for active tracking sessions (for demo purposes)
-// In production, you'd use Redis or a similar in-memory datastore
-const activeTracking = new Map();
-
-// @route   POST /api/tracking/start
-// @desc    Start tracking a user/vehicle
-// @access  Public
-router.post('/start', (req, res) => {
-  const { id, lat, lng } = req.body;
-  if (!id || !lat || !lng) {
-    return res.status(400).json({ msg: 'Missing tracking data' });
+function ownSession(req, res, next) {
+  if (req.body.id !== undefined && req.body.id !== req.userId) {
+    return res.status(403).json({ msg: 'You can only change your own tracking session' });
   }
-
-  activeTracking.set(id, { lat, lng, lastUpdated: Date.now() });
-  res.json({ msg: 'Tracking started', data: activeTracking.get(id) });
+  next();
+}
+function coordinates(req, res, next) {
+  const { lat, lng } = req.body;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return res.status(400).json({ msg: 'Valid numeric latitude and longitude are required' });
+  }
+  next();
+}
+function scope(req) { return { user: req.userId, company: req.companyId }; }
+function position(req) {
+  return { lat: req.body.lat, lng: req.body.lng, lastUpdated: new Date(), expiresAt: new Date(Date.now() + 60000) };
+}
+router.post('/start', ownSession, coordinates, async (req, res, next) => {
+  try {
+    const session = await TrackingSession.findOneAndUpdate(scope(req), { $set: position(req) },
+      { upsert: true, new: true, runValidators: true });
+    res.json({ msg: 'Tracking started', data: session });
+  } catch (err) { next(err); }
 });
-
-// @route   POST /api/tracking/update
-// @desc    Update location
-// @access  Public
-router.post('/update', (req, res) => {
-  const { id, lat, lng } = req.body;
-  if (!id || !lat || !lng) {
-    return res.status(400).json({ msg: 'Missing tracking data' });
-  }
-
-  if (activeTracking.has(id)) {
-    activeTracking.set(id, { lat, lng, lastUpdated: Date.now() });
-    res.json({ msg: 'Location updated', data: activeTracking.get(id) });
-  } else {
-    res.status(404).json({ msg: 'Tracking session not found. Please start tracking first.' });
-  }
+router.post('/update', ownSession, coordinates, async (req, res, next) => {
+  try {
+    const session = await TrackingSession.findOneAndUpdate(
+      { ...scope(req), expiresAt: { $gt: new Date() } }, { $set: position(req) }, { new: true, runValidators: true });
+    if (!session) return res.status(404).json({ msg: 'Tracking session expired. Start tracking again.' });
+    res.json({ msg: 'Location updated', data: session });
+  } catch (err) { next(err); }
 });
-
-// @route   POST /api/tracking/stop
-// @desc    Stop tracking
-// @access  Public
-router.post('/stop', (req, res) => {
-  const { id } = req.body;
-  if (!id) {
-    return res.status(400).json({ msg: 'Missing ID' });
-  }
-
-  if (activeTracking.has(id)) {
-    activeTracking.delete(id);
+router.post('/stop', ownSession, async (req, res, next) => {
+  try {
+    await TrackingSession.deleteOne(scope(req));
     res.json({ msg: 'Tracking stopped' });
-  } else {
-    res.status(404).json({ msg: 'Tracking session not found' });
-  }
+  } catch (err) { next(err); }
 });
-
-// @route   GET /api/tracking/active
-// @desc    Get all active tracking sessions
-// @access  Public
-router.get('/active', (req, res) => {
-  const sessions = Object.fromEntries(activeTracking);
-  res.json(sessions);
+router.get('/active', async (req, res, next) => {
+  try {
+    const sessions = await TrackingSession.find({ company: req.companyId, expiresAt: { $gt: new Date() } });
+    res.json(Object.fromEntries(sessions.map(s => [String(s.user), {
+      lat: s.lat, lng: s.lng, lastUpdated: new Date(s.lastUpdated).getTime()
+    }])));
+  } catch (err) { next(err); }
 });
-
 module.exports = router;

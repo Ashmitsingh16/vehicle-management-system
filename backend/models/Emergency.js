@@ -24,6 +24,7 @@ const EmergencySchema = new mongoose.Schema({
     enum: ['active', 'resolved', 'false_alarm'],
     default: 'active'
   },
+  notificationStatus: { type: String, enum: ['not_requested', 'accepted', 'failed'], default: 'not_requested' },
   createdAt: { type: Date, default: Date.now },
   resolvedAt: { type: Date }
 });

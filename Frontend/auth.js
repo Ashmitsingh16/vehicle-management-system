@@ -1,6 +1,6 @@
-const BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+const BASE_URL = window.APP_CONFIG?.apiUrl || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:5000/api'
-  : 'https://vehicle-management-system-5sy7.onrender.com/api';
+  : '/api');
 
 // Token is kept in memory + localStorage so a refresh doesn't log the user out,
 // but each browser/device still needs its own login — that's what fixes the
@@ -21,15 +21,36 @@ function showAuthTab(tab) {
     loginBtn.classList.remove('active');
     registerBtn.classList.remove('active');
   }
-  document.getElementById('authError').textContent = '';
+  const copy = {
+    login: ['Welcome back', 'Sign in to continue to your company dashboard.'],
+    register: ['Create your workspace', 'Set up your company and administrator account.'],
+    forgot: ['Reset your password', 'We will send a secure reset link to your login email.'],
+    reset: ['Choose a new password', 'Use at least six characters for your new password.']
+  };
+  document.getElementById('authHeading').textContent = copy[tab][0];
+  document.getElementById('authSubtitle').textContent = copy[tab][1];
+  const error = document.getElementById('authError');
+  error.textContent = '';
+  error.classList.remove('success');
+}
+
+function setAuthBusy(buttonId, busy, busyText) {
+  const button = document.getElementById(buttonId);
+  if (!button) return;
+  if (!button.dataset.label) button.dataset.label = button.textContent;
+  button.disabled = busy;
+  button.textContent = busy ? busyText : button.dataset.label;
 }
 
 async function handleLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   const errBox = document.getElementById('authError');
+  errBox.classList.remove('success');
   if (!email || !password) { errBox.textContent = 'Enter email and password.'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errBox.textContent = 'Enter a valid email address.'; return; }
 
+  setAuthBusy('loginSubmit', true, 'Signing in…');
   try {
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
@@ -41,6 +62,8 @@ async function handleLogin() {
     setSession(data.token, data.company);
   } catch (err) {
     errBox.textContent = 'Could not reach the server. Try again shortly.';
+  } finally {
+    setAuthBusy('loginSubmit', false);
   }
 }
 
@@ -51,9 +74,12 @@ async function handleRegister() {
   const phone = document.getElementById('regPhone').value.trim();
   const password = document.getElementById('regPassword').value;
   const errBox = document.getElementById('authError');
-  if (!companyName || !name || !email || !password) { errBox.textContent = 'Fill all fields.'; return; }
+  errBox.classList.remove('success');
+  if (!companyName || !name || !email || !phone || !password) { errBox.textContent = 'Fill all fields.'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errBox.textContent = 'Enter a valid email address.'; return; }
   if (password.length < 6) { errBox.textContent = 'Password must be at least 6 characters.'; return; }
 
+  setAuthBusy('registerSubmit', true, 'Creating account…');
   try {
     const res = await fetch(`${BASE_URL}/auth/register`, {
       method: 'POST',
@@ -65,6 +91,8 @@ async function handleRegister() {
     setSession(data.token, data.company);
   } catch (err) {
     errBox.textContent = 'Could not reach the server. Try again shortly.';
+  } finally {
+    setAuthBusy('registerSubmit', false);
   }
 }
 
@@ -73,6 +101,7 @@ async function handleForgotPassword() {
   const errBox = document.getElementById('authError');
   if (!email) { errBox.textContent = 'Enter your email.'; return; }
 
+  setAuthBusy('forgotSubmit', true, 'Sending link…');
   try {
     const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
       method: 'POST',
@@ -81,11 +110,13 @@ async function handleForgotPassword() {
     });
     const data = await res.json();
     if (!res.ok) { errBox.textContent = data.msg || 'Something went wrong.'; return; }
-    errBox.style.color = '#4ade80';
+    errBox.classList.add('success');
     errBox.textContent = data.msg;
   } catch (err) {
-    errBox.style.color = '';
+    errBox.classList.remove('success');
     errBox.textContent = 'Could not reach the server. Try again shortly.';
+  } finally {
+    setAuthBusy('forgotSubmit', false);
   }
 }
 
@@ -95,11 +126,12 @@ async function handleResetPassword() {
   const password = document.getElementById('resetPassword').value;
   const confirm = document.getElementById('resetPasswordConfirm').value;
   const errBox = document.getElementById('authError');
-  errBox.style.color = '';
+  errBox.classList.remove('success');
   if (!password || password.length < 6) { errBox.textContent = 'Password must be at least 6 characters.'; return; }
   if (password !== confirm) { errBox.textContent = 'Passwords do not match.'; return; }
   if (!pendingResetToken) { errBox.textContent = 'Missing or expired reset link.'; return; }
 
+  setAuthBusy('resetSubmit', true, 'Updating password…');
   try {
     const res = await fetch(`${BASE_URL}/auth/reset-password/${pendingResetToken}`, {
       method: 'POST',
@@ -112,10 +144,12 @@ async function handleResetPassword() {
     // Clean the token out of the URL so it can't be reused/resubmitted accidentally
     window.history.replaceState({}, document.title, window.location.pathname);
     showAuthTab('login');
-    errBox.style.color = '#4ade80';
+    errBox.classList.add('success');
     errBox.textContent = 'Password updated! You can now log in.';
   } catch (err) {
     errBox.textContent = 'Could not reach the server. Try again shortly.';
+  } finally {
+    setAuthBusy('resetSubmit', false);
   }
 }
 
@@ -128,6 +162,7 @@ function setSession(token, company) {
 }
 
 function handleLogout() {
+  if (typeof resetAppSession === 'function') resetAppSession();
   authToken = null;
   authCompany = null;
   localStorage.removeItem('vms_token');
@@ -159,6 +194,17 @@ async function authFetch(url, options = {}) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const enterActions = {
+    loginPassword: handleLogin,
+    regPassword: handleRegister,
+    forgotEmail: handleForgotPassword,
+    resetPasswordConfirm: handleResetPassword
+  };
+  Object.entries(enterActions).forEach(([id, action]) => {
+    document.getElementById(id)?.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); action(); }
+    });
+  });
   const params = new URLSearchParams(window.location.search);
   const resetToken = params.get('resetToken');
   if (resetToken) {

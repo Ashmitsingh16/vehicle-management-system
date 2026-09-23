@@ -5,10 +5,10 @@ const EMERGENCY_TYPE_LABELS = {
 };
 
 const EMERGENCY_SERVICES = {
-  default: { police: { name: "Local Police", phone: "100", relation: "emergency" }, fire: { name: "Fire Department", phone: "101", relation: "emergency" }, hospital: { name: "Ambulance Service", phone: "102", relation: "emergency" }, roadside: { name: "Roadside Assistance", phone: "1800-123-4567", relation: "emergency" } },
+  default: { police: { name: "Local Police", phone: "100", relation: "emergency" }, fire: { name: "Fire Department", phone: "101", relation: "emergency" }, hospital: { name: "Ambulance Service", phone: "102", relation: "emergency" }, roadside: { name: "Roadside Assistance", phone: "", relation: "emergency" } },
   us: { police: { name: "Local Police", phone: "911", relation: "emergency" }, fire: { name: "Fire Department", phone: "911", relation: "emergency" }, hospital: { name: "Ambulance Service", phone: "911", relation: "emergency" }, roadside: { name: "AAA Roadside Assistance", phone: "1-800-222-4357", relation: "emergency" } },
   uk: { police: { name: "Police", phone: "999", relation: "emergency" }, fire: { name: "Fire Brigade", phone: "999", relation: "emergency" }, hospital: { name: "Ambulance", phone: "999", relation: "emergency" }, roadside: { name: "RAC Breakdown", phone: "0333-2000-999", relation: "emergency" } },
-  eu: { police: { name: "Police", phone: "112", relation: "emergency" }, fire: { name: "Fire Department", phone: "112", relation: "emergency" }, hospital: { name: "Ambulance", phone: "112", relation: "emergency" }, roadside: { name: "Roadside Assistance", phone: "+44-123-456-7890", relation: "emergency" } }
+  eu: { police: { name: "Police", phone: "112", relation: "emergency" }, fire: { name: "Fire Department", phone: "112", relation: "emergency" }, hospital: { name: "Ambulance", phone: "112", relation: "emergency" }, roadside: { name: "Roadside Assistance", phone: "", relation: "emergency" } }
 };
 const REGION_LABELS = { default: "default region", us: "United States", uk: "United Kingdom", eu: "European Union" };
 
@@ -16,25 +16,41 @@ let users = [];       // "members" — people you can assign as a vehicle owner 
 let vehicles = [];
 let contacts = [];
 let trackingInterval = null;
+let locationRequestId = 0;
+let locationPending = false;
+let trackingRequested = false;
+let addressRequestId = 0;
+let lastAddressLookup = 0;
 let emergencyActive = false;
+let activeEmergencyIds = [];
+let emergencySending = false;
+let sessionGeneration = 0;
 let currentRegion = "default";
 let currentLocation = null; // no fake default — null until we actually know it
 let map, marker;
 
 // ---- App bootstrap (called by auth.js once logged in) ----
 async function initializeApp() {
+  const generation = sessionGeneration;
   try {
     showNotification("Loading your data...", "success");
-    const [uRes, vRes] = await Promise.all([
+    const [uRes, vRes, eRes, cRes] = await Promise.all([
       authFetch(`${BASE_URL}/members`),
-      authFetch(`${BASE_URL}/vehicles`)
+      authFetch(`${BASE_URL}/vehicles`),
+      authFetch(`${BASE_URL}/emergency`),
+      authFetch(`${BASE_URL}/contacts`)
     ]);
-    users = uRes.ok ? await uRes.json() : [];
-    vehicles = vRes.ok ? await vRes.json() : [];
-    contacts = [
-      { id: 1, name: 'Emergency Services', phone: '911', relation: 'emergency' },
-      { id: 2, name: 'Family Contact', phone: '+1234567890', relation: 'family' }
-    ];
+    if (!uRes.ok || !vRes.ok || !eRes.ok || !cRes.ok) throw new Error('Could not load account data');
+    const [members, ownedVehicles, emergencies, savedContacts] = await Promise.all([uRes.json(), vRes.json(), eRes.json(), cRes.json()]);
+    if (generation !== sessionGeneration) return;
+    users = members;
+    vehicles = ownedVehicles;
+    contacts = savedContacts;
+    activeEmergencyIds = emergencies.map(item => item._id);
+    emergencyActive = activeEmergencyIds.length > 0;
+    document.getElementById("emergencyBanner").classList.toggle('show', emergencyActive);
+    document.getElementById("emergencyBannerDetail").textContent = emergencyActive
+      ? `${activeEmergencyIds.length} saved active alert(s). Emergency services are not contacted by this app.` : '';
     updateDashboard();
     updateUserTable();
     updateVehicleTable();
@@ -42,7 +58,7 @@ async function initializeApp() {
     updateVehicleOwnerOptions();
     checkVehicleOwnerDependency();
     updatePredefinedContacts();
-    getCurrentLocation();
+    document.getElementById("currentLocation").textContent = "Select Update Location to request access.";
     showNotification("Application loaded!", "success");
   } catch (error) {
     console.error("Failed to initialize app:", error);
@@ -54,7 +70,11 @@ function showSection(sectionId) {
   document.querySelectorAll(".content-section").forEach(s => s.classList.remove("active"));
   document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
   document.getElementById(sectionId).classList.add("active");
-  if (typeof event !== 'undefined' && event.target) event.target.classList.add("active");
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    const selected = tab.dataset.section === sectionId;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-pressed', String(selected));
+  });
   if (sectionId === 'tracking' && currentLocation) initMap(currentLocation.lat, currentLocation.lng);
   if (sectionId === 'vehicles') checkVehicleOwnerDependency();
 }
@@ -85,59 +105,81 @@ function closeEmergencyModal() {
 }
 
 async function confirmEmergency() {
+  if (emergencySending) return;
+  emergencySending = true;
+  const generation = sessionGeneration;
   closeEmergencyModal();
-  const emergencyType = document.getElementById("emergencyType").value;
-  const severityLevel = document.getElementById("severityLevel").value;
+  const type = document.getElementById("emergencyType").value;
+  const severity = document.getElementById("severityLevel").value;
   const description = document.getElementById("emergencyDescription").value;
-  const recipientEmail = document.getElementById("recipientEmail").value;
-  const storedUserEmails = users.map(u => u.email).filter(Boolean);
-  let allEmails = [...storedUserEmails];
-  if (recipientEmail) allEmails.push(recipientEmail);
-  const finalEmails = [...new Set(allEmails)].join(',');
-
-  showNotification("🚨 EMERGENCY ALERT TRIGGERED!", "error");
-  emergencyActive = true;
-  updateDashboard();
-  const triggeredAt = new Date();
-  addActivity(`Emergency Alert: ${emergencyType} (${severityLevel} severity)`);
-
+  const extraEmail = document.getElementById("recipientEmail").value.trim();
+  const recipientEmail = [...new Set([...users.map(u => u.email).filter(Boolean), ...(extraEmail ? [extraEmail] : [])])].join(',');
+  showNotification("Saving alert and requesting email notification...", "success");
   try {
-    // NOTE: this now correctly hits /emergency (singular) to match the backend route.
-    await authFetch(`${BASE_URL}/emergency`, {
-      method: 'POST',
-      body: JSON.stringify({ type: emergencyType, severity: severityLevel, description, location: currentLocation, recipientEmail: finalEmails })
+    const response = await authFetch(`${BASE_URL}/emergency`, {
+      method: 'POST', body: JSON.stringify({ type, severity, description, location: currentLocation, recipientEmail })
     });
+    if (!response.ok) throw new Error('Alert could not be saved');
+    const alert = await response.json();
+    if (generation !== sessionGeneration) return;
+    activeEmergencyIds.push(alert._id);
+    emergencyActive = true;
+    updateDashboard();
+    const emailStatus = alert.notificationStatus === 'accepted'
+      ? 'Email accepted for sending; delivery is not confirmed.'
+      : alert.notificationStatus === 'failed' ? 'Email failed. Contact your recipients directly.' : 'No email requested.';
+    document.getElementById("emergencyBannerDetail").textContent =
+      `Alert saved. ${emailStatus} Emergency services are not contacted by this app. Call them directly if needed.`;
+    document.getElementById("emergencyBanner").classList.add('show');
+    addActivity(`Saved emergency alert: ${EMERGENCY_TYPE_LABELS[type] || type}`);
+    showNotification(`Alert saved. ${emailStatus}`, alert.notificationStatus === 'accepted' ? 'success' : 'error');
   } catch (err) {
-    console.error('Failed to send emergency to backend', err);
-    showNotification("Alert shown locally, but saving to the server failed.", "error");
+    if (generation === sessionGeneration) showNotification('Could not confirm that the alert was saved. Contact recipients directly and reload to check before retrying.', 'error');
+  } finally {
+    if (generation === sessionGeneration) emergencySending = false;
   }
-
-  let emergencyService = "";
-  switch (emergencyType) {
-    case "accident": case "security": emergencyService = "police"; break;
-    case "fire": emergencyService = "fire"; break;
-    case "medical": emergencyService = "hospital"; break;
-    case "breakdown": emergencyService = "roadside"; break;
-  }
-  let contactedLabel = "";
-  if (emergencyService) {
-    const service = EMERGENCY_SERVICES[currentRegion][emergencyService];
-    contactedLabel = `${service.name} at ${service.phone}`;
-    addActivity(`Automatically contacted ${contactedLabel}`);
-    showNotification(`Contacted ${service.name} at ${service.phone}`, "success");
-  }
-  document.getElementById("emergencyBannerDetail").textContent =
-    `${EMERGENCY_TYPE_LABELS[emergencyType] || emergencyType} · ${severityLevel} severity · reported ${triggeredAt.toLocaleTimeString()}${contactedLabel ? " · Notified " + contactedLabel : ""}`;
-  document.getElementById("emergencyBanner").classList.add("show");
-  setTimeout(() => showNotification("Emergency services have been notified. Help is on the way!", "success"), 2000);
 }
 
-function resolveEmergency() {
-  emergencyActive = false;
-  updateDashboard();
-  document.getElementById("emergencyBanner").classList.remove("show");
-  addActivity("Emergency marked as resolved");
-  showNotification("Emergency marked as resolved.", "success");
+async function resolveEmergency() {
+  const generation = sessionGeneration;
+  try {
+    for (const id of [...activeEmergencyIds]) {
+      const response = await authFetch(`${BASE_URL}/emergency/${encodeURIComponent(id)}/resolve`, { method: 'PUT' });
+      if (generation !== sessionGeneration) return;
+      if (!response.ok) throw new Error('Could not resolve alert');
+      activeEmergencyIds = activeEmergencyIds.filter(value => value !== id);
+    }
+    emergencyActive = false;
+    updateDashboard();
+    document.getElementById("emergencyBanner").classList.remove('show');
+    addActivity('Emergency alerts resolved on server');
+    showNotification('Emergency alerts resolved.');
+  } catch (err) {
+    if (generation === sessionGeneration) showNotification('Some alerts could not be resolved. Please retry.', 'error');
+  }
+}
+
+function resetAppSession() {
+  sessionGeneration++;
+  locationRequestId++; addressRequestId++;
+  locationPending = false; trackingRequested = false; lastAddressLookup = 0;
+  document.getElementById("trackingErrorBanner").classList.remove("show");
+  document.getElementById("trackingStatus").textContent = "Location not requested";
+  if (trackingInterval) clearInterval(trackingInterval);
+  trackingInterval = null;
+  currentLocation = null;
+  users = []; vehicles = []; contacts = [];
+  activeEmergencyIds = []; emergencyActive = false; emergencySending = false;
+  currentRegion = 'default';
+  if (map) map.remove();
+  map = null; marker = null;
+  document.getElementById('activityList').textContent = '';
+  document.getElementById('emergencyBanner').classList.remove('show');
+  document.getElementById('emergencyBannerDetail').textContent = '';
+  document.getElementById('currentCoords').textContent = '-';
+  document.getElementById('currentLocation').textContent = 'Location unavailable';
+  document.getElementById('lastUpdated').textContent = 'Never';
+  updateDashboard(); updateUserTable(); updateVehicleTable(); updateContactTable(); updateVehicleOwnerOptions();
 }
 
 // ---- Map / GPS (Leaflet + OpenStreetMap — free, no API key needed) ----
@@ -159,19 +201,24 @@ function initMap(lat, lng) {
   marker = L.marker([lat, lng]).addTo(map).bindPopup("Your Location").openPopup();
 
   // Leaflet needs a resize nudge if the map div was hidden (display:none) when created
-  setTimeout(() => map.invalidateSize(), 200);
+  const visibleMap = map;
+  setTimeout(() => { if (map === visibleMap) visibleMap.invalidateSize(); }, 200);
 }
 
 // Free reverse-geocoding via OpenStreetMap's Nominatim service (no key required).
 // Please keep usage light — Nominatim's public endpoint is rate-limited.
 async function getAddress(lat, lng) {
+  const generation = sessionGeneration;
+  const request = ++addressRequestId;
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
       headers: { 'Accept-Language': 'en' }
     });
     const data = await res.json();
+    if (generation !== sessionGeneration || request !== addressRequestId) return;
     document.getElementById("currentLocation").textContent = data.display_name || "Address not available";
   } catch (err) {
+    if (generation !== sessionGeneration || request !== addressRequestId) return;
     document.getElementById("currentLocation").textContent = "Address not available";
   }
 }
@@ -183,66 +230,86 @@ function classifyRegion(lat, lng) {
   return "default";
 }
 
-// Fixed: previously used the browser's default accuracy settings, which on a
-// laptop/desktop can fall back to Wi-Fi/IP-based positioning that's wrong by
-// entire states. We now always request GPS explicitly, surface the accuracy
-// radius to the user, and refuse to silently trust a low-accuracy reading.
-function getCurrentLocation() {
-  if (!navigator.geolocation) {
-    document.getElementById("trackingErrorText").textContent = "⚠️ Geolocation is not supported in this browser.";
-    document.getElementById("trackingErrorBanner").classList.add("show");
-    showNotification("Geolocation is not supported", "error");
-    return;
+// Request location only after a user action. Accuracy is reported, not inferred
+// as proof that a particular positioning source (GPS/Wi-Fi) was used.
+function locationMessage(text, warning = false) {
+  document.getElementById('trackingStatus').textContent = text;
+  document.getElementById('trackingErrorText').textContent = text;
+  document.getElementById('trackingErrorBanner').classList.toggle('show', warning);
+}
+function clearLocation() {
+  currentLocation = null; addressRequestId++;
+  document.getElementById('currentCoords').textContent = '-';
+  document.getElementById('currentLocation').textContent = 'Location unavailable';
+  document.getElementById('lastUpdated').textContent = 'Never';
+  if (map) map.remove(); map = null; marker = null;
+}
+function acceptLocation(lat, lng, accuracy, manual = false) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+  currentLocation = { lat, lng };
+  document.getElementById('currentCoords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}${manual ? ' (entered manually)' : Number.isFinite(accuracy) ? ` (±${Math.round(accuracy)}m)` : ''}`;
+  document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  currentRegion = classifyRegion(lat, lng); updatePredefinedContacts(); initMap(lat, lng);
+  if (manual) {
+    addressRequestId++;
+    document.getElementById('currentLocation').textContent = 'Manually entered location — not live tracking';
+  } else if (!lastAddressLookup || Date.now() - lastAddressLookup >= 30000) {
+    lastAddressLookup = Date.now();
+    document.getElementById('currentLocation').textContent = 'Looking up address…';
+    getAddress(lat, lng);
   }
-
-  navigator.geolocation.getCurrentPosition(
-    position => {
-      const { latitude: lat, longitude: lng, accuracy } = position.coords;
-      currentLocation = { lat, lng };
-      document.getElementById("currentCoords").textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)} (±${Math.round(accuracy)}m)`;
-      document.getElementById("lastUpdated").textContent = new Date().toLocaleTimeString();
-
-      if (accuracy > 1000) {
-        document.getElementById("trackingErrorText").textContent =
-          `⚠️ Low-accuracy reading (±${Math.round(accuracy)}m) — this device has no GPS, so it's using Wi-Fi/network positioning, which can be off by an entire city or state. For accurate tracking, open this page on a phone with GPS/location enabled, outdoors if possible.`;
-        document.getElementById("trackingErrorBanner").classList.add("show");
-      } else {
-        document.getElementById("trackingErrorBanner").classList.remove("show");
-      }
-
-      currentRegion = classifyRegion(lat, lng);
-      getAddress(lat, lng);
-      showNotification("Location updated successfully!", "success");
-      updatePredefinedContacts();
-      initMap(lat, lng);
-    },
-    error => {
-      let reason = "Location unavailable — check browser permissions.";
-      if (error.code === 1) reason = "Location access denied — enable permissions for this site, then Retry.";
-      else if (error.code === 2) reason = "Location unavailable right now — check your device's GPS/network, then Retry.";
-      else if (error.code === 3) reason = "Location request timed out — try again.";
-      document.getElementById("trackingErrorText").textContent = `⚠️ ${reason}`;
-      document.getElementById("trackingErrorBanner").classList.add("show");
-      document.getElementById("currentLocation").textContent = "Location unavailable";
-      document.getElementById("currentCoords").textContent = "-";
-      showNotification(reason, "error");
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-  );
+  return true;
 }
-
+function getCurrentLocation() {
+  if (locationPending) return;
+  const generation = sessionGeneration;
+  const request = ++locationRequestId;
+  const fail = error => {
+    if (generation !== sessionGeneration || request !== locationRequestId) return;
+    locationPending = false; trackingRequested = false;
+    if (trackingInterval !== null) clearInterval(trackingInterval);
+    trackingInterval = null; clearLocation();
+    const reason = error.code === 1
+      ? 'Location permission is blocked. Allow location for this site in your browser settings, then retry.'
+      : error.code === 3
+      ? 'The browser did not return a location in 30 seconds. Retry, open the app in your usual browser, or enter coordinates below.'
+      : 'This browser could not determine your location. Try your usual browser with location enabled, or enter coordinates below.';
+    locationMessage(reason, true);
+  };
+  if (!navigator.geolocation) { fail({ code: 2 }); return; }
+  locationPending = true;
+  locationMessage(trackingRequested ? 'Starting tracking — waiting for location…' : 'Waiting for browser location…');
+  navigator.geolocation.getCurrentPosition(position => {
+    if (generation !== sessionGeneration || request !== locationRequestId) return;
+    locationPending = false;
+    const { latitude, longitude, accuracy } = position.coords;
+    if (!acceptLocation(latitude, longitude, accuracy)) { fail({ code: 2 }); return; }
+    const approximate = accuracy > 1000;
+    locationMessage(approximate ? `Approximate location (±${Math.round(accuracy)}m). Check it before using it for an emergency.` : trackingRequested ? 'Local tracking active' : 'Location updated', approximate);
+    if (trackingRequested && trackingInterval === null) trackingInterval = setInterval(getCurrentLocation, 10000);
+  }, fail, { enableHighAccuracy: false, timeout: 30000, maximumAge: 10000 });
+}
 function startTracking() {
-  if (trackingInterval) { showNotification("Tracking is already active", "error"); return; }
+  if (trackingRequested) return;
+  trackingRequested = true;
   getCurrentLocation();
-  trackingInterval = setInterval(getCurrentLocation, 5000);
-  showNotification("Tracking started - updating every 5 seconds", "success");
 }
-
 function stopTracking() {
-  if (!trackingInterval) { showNotification("No active tracking to stop", "error"); return; }
-  clearInterval(trackingInterval);
-  trackingInterval = null;
-  showNotification("Tracking stopped", "success");
+  trackingRequested = false;
+  if (trackingInterval !== null) clearInterval(trackingInterval);
+  trackingInterval = null; locationRequestId++; locationPending = false;
+  locationMessage('Tracking stopped. Displayed coordinates are the last recorded location.');
+}
+function useManualLocation() {
+  const latText = document.getElementById('manualLatitude').value.trim();
+  const lngText = document.getElementById('manualLongitude').value.trim();
+  const lat = Number(latText), lng = Number(lngText);
+  if (!latText || !lngText || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    locationMessage('Enter a latitude from -90 to 90 and longitude from -180 to 180.', true); return;
+  }
+  stopTracking();
+  acceptLocation(lat, lng, null, true);
+  locationMessage('Manual location selected. This is not live tracking.');
 }
 
 // ---- Predefined emergency contacts ----
@@ -251,23 +318,15 @@ function updatePredefinedContacts() {
   document.getElementById("policeContact").textContent = `${services.police.name}: ${services.police.phone}`;
   document.getElementById("fireContact").textContent = `${services.fire.name}: ${services.fire.phone}`;
   document.getElementById("hospitalContact").textContent = `${services.hospital.name}: ${services.hospital.phone}`;
-  document.getElementById("roadsideContact").textContent = `${services.roadside.name}: ${services.roadside.phone}`;
+  document.getElementById("roadsideContact").textContent = `${services.roadside.name}: ${services.roadside.phone || 'Add your provider’s number'}`;
   const label = document.getElementById("regionLabel");
   if (label) label.textContent = REGION_LABELS[currentRegion] || currentRegion;
 }
 
-function addPredefinedContact(type) {
+async function addPredefinedContact(type) {
   const service = EMERGENCY_SERVICES[currentRegion][type];
-  const newContact = { id: Date.now(), name: service.name, phone: service.phone, relation: service.relation };
-  if (contacts.some(c => c.phone === service.phone)) {
-    showNotification(`${service.name} is already in your contacts`, "error");
-    return;
-  }
-  contacts.push(newContact);
-  updateContactTable();
-  updateDashboard();
-  addActivity(`Added ${service.name} to emergency contacts`);
-  showNotification(`${service.name} added to contacts!`, "success");
+  if (!service.phone) { showNotification('Add your provider’s verified number manually.', 'error'); return; }
+  await saveContact({ name: service.name, phone: service.phone, relation: service.relation });
 }
 
 // ---- Dashboard / activity ----
@@ -314,13 +373,21 @@ async function addUser() {
   } catch (err) { showNotification("Server error", "error"); }
 }
 
+function appendDataRow(tbody, values, onDelete) {
+  const row = tbody.insertRow();
+  values.forEach(value => { row.insertCell().textContent = String(value ?? ''); });
+  const button = document.createElement('button');
+  button.className = 'btn btn-danger';
+  button.textContent = 'Delete';
+  button.addEventListener('click', onDelete);
+  row.insertCell().appendChild(button);
+}
+
 function updateUserTable() {
-  const tbody = document.querySelector("#userTable tbody");
-  tbody.innerHTML = "";
-  users.forEach(user => {
-    const row = tbody.insertRow();
-    row.innerHTML = `<td>${user.name}</td><td>${user.email}</td><td>${user.phone || 'N/A'}</td><td><button class="btn btn-danger" onclick="deleteUser('${user._id || user.id}')">Delete</button></td>`;
-  });
+  const tbody = document.querySelector('#userTable tbody');
+  tbody.textContent = '';
+  users.forEach(user => appendDataRow(tbody, [user.name, user.email, user.phone || 'N/A'],
+    () => deleteUser(user._id || user.id)));
 }
 
 async function deleteUser(id) {
@@ -355,12 +422,13 @@ async function addVehicle() {
 }
 
 function updateVehicleTable() {
-  const tbody = document.querySelector("#vehicleTable tbody");
-  tbody.innerHTML = "";
+  const tbody = document.querySelector('#vehicleTable tbody');
+  tbody.textContent = '';
   vehicles.forEach(vehicle => {
-    const ownerObj = vehicle.owner && typeof vehicle.owner === 'object' ? vehicle.owner : users.find(u => String(u._id || u.id) === String(vehicle.owner));
-    const row = tbody.insertRow();
-    row.innerHTML = `<td>${vehicle.make}</td><td>${vehicle.model}</td><td>${vehicle.year}</td><td>${vehicle.license}</td><td>${ownerObj ? ownerObj.name : 'Unknown'}</td><td><button class="btn btn-danger" onclick="deleteVehicle('${vehicle._id || vehicle.id}')">Delete</button></td>`;
+    const owner = vehicle.owner && typeof vehicle.owner === 'object' ? vehicle.owner
+      : users.find(u => String(u._id || u.id) === String(vehicle.owner));
+    appendDataRow(tbody, [vehicle.make, vehicle.model, vehicle.year, vehicle.license, owner ? owner.name : 'Unknown'],
+      () => deleteVehicle(vehicle._id || vehicle.id));
   });
 }
 
@@ -386,35 +454,57 @@ function updateVehicleOwnerOptions() {
   });
 }
 
-// ---- Personal emergency contacts (client-side only) ----
-function addContact() {
-  const name = document.getElementById("contactName").value;
-  const phone = document.getElementById("contactPhone").value;
-  const relation = document.getElementById("contactRelation").value;
-  if (!(name && phone && relation)) { showNotification("Please fill all fields", "error"); return; }
-  contacts.push({ id: Date.now(), name, phone, relation });
-  updateContactTable(); updateDashboard();
-  addActivity(`New emergency contact added: ${name}`);
-  document.getElementById("contactName").value = "";
-  document.getElementById("contactPhone").value = "";
-  document.getElementById("contactRelation").value = "family";
-  showNotification("Contact added successfully!", "success");
+// ---- Personal emergency contacts (stored against the logged-in account) ----
+async function saveContact(contact) {
+  const generation = sessionGeneration;
+  try {
+    const response = await authFetch(`${BASE_URL}/contacts`, { method: 'POST', body: JSON.stringify(contact) });
+    const data = await response.json();
+    if (generation !== sessionGeneration) return false;
+    if (!response.ok) { showNotification(data.msg || 'Could not save contact', 'error'); return false; }
+    contacts.push(data);
+    updateContactTable(); updateDashboard();
+    addActivity(`Contact saved: ${data.name}`);
+    showNotification('Contact saved to your account.');
+    return true;
+  } catch (err) {
+    if (generation === sessionGeneration) showNotification('Could not save contact. Please retry.', 'error');
+    return false;
+  }
+}
+
+async function addContact() {
+  const name = document.getElementById('contactName').value;
+  const phone = document.getElementById('contactPhone').value;
+  const relation = document.getElementById('contactRelation').value;
+  if (!(name.trim() && phone.trim() && relation)) { showNotification('Please fill all fields', 'error'); return; }
+  if (await saveContact({ name, phone, relation })) {
+    document.getElementById('contactName').value = '';
+    document.getElementById('contactPhone').value = '';
+    document.getElementById('contactRelation').value = 'family';
+  }
 }
 
 function updateContactTable() {
-  const tbody = document.querySelector("#contactTable tbody");
-  tbody.innerHTML = "";
-  contacts.forEach(contact => {
-    const row = tbody.insertRow();
-    row.innerHTML = `<td>${contact.name}</td><td>${contact.phone}</td><td>${contact.relation}</td><td><button class="btn btn-danger" onclick="deleteContact(${contact.id})">Delete</button></td>`;
-  });
+  const tbody = document.querySelector('#contactTable tbody');
+  tbody.textContent = '';
+  contacts.forEach(contact => appendDataRow(tbody, [contact.name, contact.phone, contact.relation],
+    () => deleteContact(contact._id)));
 }
 
-function deleteContact(id) {
-  contacts = contacts.filter(c => c.id !== id);
-  updateContactTable(); updateDashboard();
-  addActivity(`Emergency contact deleted`);
-  showNotification("Contact deleted successfully!", "success");
+async function deleteContact(id) {
+  const generation = sessionGeneration;
+  try {
+    const response = await authFetch(`${BASE_URL}/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (generation !== sessionGeneration) return;
+    if (!response.ok) { showNotification('Could not remove contact. Please retry.', 'error'); return; }
+    contacts = contacts.filter(contact => contact._id !== id);
+    updateContactTable(); updateDashboard();
+    addActivity('Contact removed');
+    showNotification('Contact removed from your account.');
+  } catch (err) {
+    if (generation === sessionGeneration) showNotification('Could not remove contact. Please retry.', 'error');
+  }
 }
 
 // ---- Notifications ----

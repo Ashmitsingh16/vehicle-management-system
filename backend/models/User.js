@@ -14,6 +14,7 @@ const UserSchema = new mongoose.Schema({
     relation: { type: String, default: 'other' }
   }],
   vehicles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle' }],
+  tokenVersion: { type: Number, default: 0 },
   resetPasswordToken: { type: String },
   resetPasswordExpires: { type: Date },
   createdAt: { type: Date, default: Date.now }
@@ -21,6 +22,7 @@ const UserSchema = new mongoose.Schema({
 
 UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
+  if (!this.isNew) this.tokenVersion = (this.tokenVersion || 0) + 1;
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });

@@ -5,8 +5,11 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 
 dotenv.config();
+require('./config/production')();
+require('./config/jwt').getJwtSecret();
 
 const app = express();
+require('./middleware/rateLimit').configureProxy(app);
 
 // Middleware
 app.use(bodyParser.json());
@@ -36,6 +39,7 @@ connectDB();
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/contacts', require('./routes/contactRoutes'));
 app.use('/api/members', require('./routes/memberRoutes'));
 app.use('/api/vehicles', require('./routes/vehicleRoutes'));
 app.use('/api/emergency', require('./routes/emergencyRoutes'));

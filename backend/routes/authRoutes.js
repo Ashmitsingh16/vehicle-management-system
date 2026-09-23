@@ -1,18 +1,22 @@
 const express = require('express');
 const router = express.Router();
+const { authIpLimiter, authAccountLimiter, resetAccountLimiter } = require('../middleware/rateLimit');
+router.use(['/login', '/register', '/reset-password'], authIpLimiter, authAccountLimiter);
+router.use('/forgot-password', authIpLimiter, resetAccountLimiter);
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
-const Company = require('../models/Company');
+const registerCompany = require('../services/registerCompany');
 const { sendMail } = require('../utils/mailer');
 
 const auth = require('../middleware/auth');
+const { getJwtSecret } = require('../config/jwt');
 
 function signToken(user) {
-  const payload = { user: { id: user.id, companyId: user.company, role: user.role } };
+  const payload = { tokenVersion: user.tokenVersion || 0, user: { id: user.id, companyId: user.company._id || user.company, role: user.role } };
   return jwt.sign(
     payload,
-    process.env.JWT_SECRET || 'secret',
+    getJwtSecret(),
     { expiresIn: process.env.JWT_EXPIRE || '7d' }
   );
 }
@@ -22,10 +26,12 @@ function signToken(user) {
 // @access  Public
 router.post('/register', async (req, res) => {
   try {
-    const { companyName, name, email, phone, password } = req.body;
+    const { companyName, name, phone, password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim() : '';
 
-    if (!companyName || !name || !email || !password) {
-      return res.status(400).json({ msg: 'companyName, name, email and password are required' });
+    if (![companyName, name, phone].every(value => typeof value === 'string' && value.trim()) ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ msg: 'Company, name, phone, valid email and a password of at least 6 characters are required' });
     }
 
     let user = await User.findOne({ email });
@@ -33,10 +39,9 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ msg: 'An account with this email already exists' });
     }
 
-    const company = await Company.create({ name: companyName });
-
-    user = new User({ name, email, phone, password, company: company._id, role: 'admin' });
-    await user.save();
+    const registration = await registerCompany({ companyName, name, email, phone, password });
+    user = registration.user;
+    const company = registration.company;
 
     const token = signToken(user);
     res.json({
@@ -45,6 +50,7 @@ router.post('/register', async (req, res) => {
       company: { id: company.id, name: company.name }
     });
   } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ msg: 'An account with this email already exists' });
     console.error(err.message);
     res.status(500).send('Server error');
   }
@@ -55,7 +61,9 @@ router.post('/register', async (req, res) => {
 // @access  Public
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+    if (!email || typeof password !== 'string') return res.status(400).json({ msg: 'Email and password are required' });
 
     const user = await User.findOne({ email }).populate('company', 'name');
     if (!user) {
@@ -87,9 +95,11 @@ router.post('/team', auth, async (req, res) => {
     if (req.companyRole !== 'admin') {
       return res.status(403).json({ msg: 'Only a company admin can add team members' });
     }
-    const { name, email, phone, password, role } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ msg: 'name, email and password are required' });
+    const { name, phone, password, role } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+    if (![name, phone].every(value => typeof value === 'string' && value.trim()) ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ msg: 'Name, phone, valid email and a password of at least 6 characters are required' });
     }
 
     let user = await User.findOne({ email });
@@ -119,7 +129,7 @@ router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   const genericMsg = { msg: 'If an account exists for that email, a reset link has been sent.' };
   try {
-    if (!email) return res.status(400).json({ msg: 'Email is required' });
+    if (typeof email !== 'string' || !email.trim()) return res.status(400).json({ msg: 'Email is required' });
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.json(genericMsg); // don't leak whether the email exists
@@ -166,7 +176,7 @@ router.post('/forgot-password', async (req, res) => {
 router.post('/reset-password/:token', async (req, res) => {
   try {
     const { password } = req.body;
-    if (!password || password.length < 6) {
+    if (typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ msg: 'Password must be at least 6 characters' });
     }
 

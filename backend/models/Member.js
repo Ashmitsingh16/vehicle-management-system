@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 // model is for. Keeping these separate means adding a member never needs a
 // password and login accounts never get cluttered with non-login people.
 const MemberSchema = new mongoose.Schema({
+  ownershipRevision: { type: Number, default: 0, select: false },
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, trim: true, lowercase: true },
   phone: { type: String },
