@@ -20,3 +20,5 @@ Thumbs.db
 !.env.local.example
 client_secret*.json
 *password*.txt
+
+dist/

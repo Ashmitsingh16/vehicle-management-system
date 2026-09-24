@@ -18,3 +18,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm audit --omit=dev --audit-level=high
+      - name: Validate static deployment build
+        run: node ../scripts/build-frontend.cjs
+        env:
+          API_URL: https://api.example.com/api

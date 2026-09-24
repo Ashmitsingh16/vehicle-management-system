@@ -47,3 +47,7 @@ GitHub Actions runs tests and dependency audits on pushes and pull requests; Kis
 The sender uses a stored OAuth refresh token; there is no deployed OAuth callback route in this app. Do not invent a production redirect URI. If reauthorizing using OAuth Playground, retain the redirect URI for that actual authorization flow. Confirm the Google project's publishing/testing status and refresh-token lifetime before relying on unattended delivery. Handle any verification requirements for your chosen audience.
 
 A saved alert and Gmail accepting a message do not guarantee delivery. This app does not dispatch emergency services. Confirm contact delivery and clearly communicate these limits. Browser GPS still depends on user permission and device availability.
+
+## Free setup
+
+See FREE-HOSTING.md and render.yaml for the optional free testing deployment. No resources are created merely by committing these files.
